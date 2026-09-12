@@ -72,7 +72,7 @@ python3 convert_ld2.py --install "/path/to/MyDictionary.ld2"
 
 ## Activating in macOS Dictionary
 
-1. If you didn't use `--install`, double-click the resulting `.dictionary` file (or drag it into `~/Library/Dictionaries/`).
+1. If you didn't use `--install`, copy the resulting `.dictionary` file (or drag it into `~/Library/Dictionaries/`).
 2. Open **Dictionary.app** on your Mac.
 3. Open **Settings / Preferences** (`Cmd + ,`).
 4. Scroll down the dictionary list, check the box next to your new dictionary, and drag it to your desired priority order.
