@@ -330,8 +330,8 @@ def enable_in_preferences(dict_path: Path):
         print(f"    [!] Note: Could not auto-update preferences: {e}")
 
 
-def locate_ddk(ddk_path: Path) -> Path:
-    """Locate the Apple Dictionary Development Kit tools from local or system directories."""
+def locate_ddk(ddk_path: Path, allow_download: bool = False) -> Path:
+    """Locate the Apple Dictionary Development Kit tools, or prompt to download if missing."""
     # 1. Specified / default path
     if (ddk_path / "bin" / "build_dict.sh").exists():
         return ddk_path
@@ -341,13 +341,35 @@ def locate_ddk(ddk_path: Path) -> Path:
     if (sys_ddk / "bin" / "build_dict.sh").exists():
         return sys_ddk
 
+    # 3. Prompt or auto-download if requested
+    should_download = allow_download
+    if not should_download and sys.stdin.isatty():
+        print(f"[*] Apple Dictionary Development Kit was not found at '{ddk_path}'.")
+        choice = input("    Would you like to automatically download the DDK tools into ./ddk? [Y/n]: ").strip().lower()
+        if choice in ("", "y", "yes"):
+            should_download = True
+
+    if should_download:
+        print(f"[*] Downloading Apple DDK tools into {ddk_path}...")
+        ddk_path.mkdir(parents=True, exist_ok=True)
+        subprocess.run([
+            "git", "clone", "--depth", "1",
+            "https://github.com/drewtu2/Apple-Dictionary-Development-Kit.git",
+            str(ddk_path)
+        ], check=True)
+        for b in (ddk_path / "bin").glob("*"):
+            b.chmod(0o755)
+        print("[✓] Apple DDK ready!\n")
+        return ddk_path
+
     raise FileNotFoundError(
         f"Apple Dictionary Development Kit not found at '{ddk_path}' or '{sys_ddk}'.\n"
-        f"Please place the 'ddk' folder next to convert_ld2.py, or specify its path using --ddk /path/to/ddk"
+        f"To install it, run: git clone --depth 1 https://github.com/drewtu2/Apple-Dictionary-Development-Kit.git ddk\n"
+        f"Or rerun convert_ld2.py with the --download-ddk flag."
     )
 
 
-def convert_ld2_to_apple_dict(ld2_path: str, output_dir: str = None, ddk_dir: str = None, install: bool = False):
+def convert_ld2_to_apple_dict(ld2_path: str, output_dir: str = None, ddk_dir: str = None, install: bool = False, download_ddk: bool = False):
     ld2_file = Path(ld2_path).resolve()
     dict_base_name = ld2_file.stem
     
@@ -367,7 +389,7 @@ def convert_ld2_to_apple_dict(ld2_path: str, output_dir: str = None, ddk_dir: st
     else:
         target_ddk = Path(ddk_dir).resolve()
         
-    ddk_path = locate_ddk(target_ddk)
+    ddk_path = locate_ddk(target_ddk, allow_download=download_ddk)
     build_dict_script = ddk_path / "bin" / "build_dict.sh"
 
     # 1. Decompress LD2
@@ -535,6 +557,7 @@ def main():
     parser = argparse.ArgumentParser(description="Convert Lingoes LD2 dictionaries to Apple Dictionary (.dictionary)")
     parser.add_argument("input", nargs="*", help="Path to .ld2 file(s). If none specified, converts all .ld2 in current folder.")
     parser.add_argument("--ddk", default=str(DEFAULT_DDK_DIR), help="Path to Apple Dictionary Development Kit folder")
+    parser.add_argument("--download-ddk", action="store_true", help="Automatically download Apple DDK tools if missing")
     parser.add_argument("--install", action="store_true", help="Automatically install to ~/Library/Dictionaries")
     parser.add_argument("--output-dir", default=None, help="Temporary build directory")
 
@@ -555,7 +578,13 @@ def main():
 
     for f in files:
         try:
-            convert_ld2_to_apple_dict(f, output_dir=args.output_dir, ddk_dir=args.ddk, install=args.install)
+            convert_ld2_to_apple_dict(
+                f,
+                output_dir=args.output_dir,
+                ddk_dir=args.ddk,
+                install=args.install,
+                download_ddk=args.download_ddk
+            )
         except Exception as e:
             print(f"[!] Error converting {f}: {e}")
             import traceback
