@@ -330,26 +330,21 @@ def enable_in_preferences(dict_path: Path):
         print(f"    [!] Note: Could not auto-update preferences: {e}")
 
 
-def ensure_ddk(ddk_path: Path):
-    """Ensure the Apple Dictionary Development Kit tools exist, downloading if needed."""
-    build_script = ddk_path / "bin" / "build_dict.sh"
-    if build_script.exists():
-        return
-    # Check system path
+def locate_ddk(ddk_path: Path) -> Path:
+    """Locate the Apple Dictionary Development Kit tools from local or system directories."""
+    # 1. Specified / default path
+    if (ddk_path / "bin" / "build_dict.sh").exists():
+        return ddk_path
+    
+    # 2. Apple standard system installation path
     sys_ddk = Path("/Applications/Utilities/Dictionary Development Kit")
     if (sys_ddk / "bin" / "build_dict.sh").exists():
-        return
-    print(f"[*] Apple Dictionary Development Kit not found at {ddk_path}.")
-    print("[*] Downloading Apple DDK tools for macOS...")
-    ddk_path.mkdir(parents=True, exist_ok=True)
-    subprocess.run([
-        "git", "clone", "--depth", "1",
-        "https://github.com/drewtu2/Apple-Dictionary-Development-Kit.git",
-        str(ddk_path)
-    ], check=True)
-    for b in (ddk_path / "bin").glob("*"):
-        b.chmod(0o755)
-    print("[✓] Apple DDK ready!\n")
+        return sys_ddk
+
+    raise FileNotFoundError(
+        f"Apple Dictionary Development Kit not found at '{ddk_path}' or '{sys_ddk}'.\n"
+        f"Please place the 'ddk' folder next to convert_ld2.py, or specify its path using --ddk /path/to/ddk"
+    )
 
 
 def convert_ld2_to_apple_dict(ld2_path: str, output_dir: str = None, ddk_dir: str = None, install: bool = False):
@@ -368,22 +363,12 @@ def convert_ld2_to_apple_dict(ld2_path: str, output_dir: str = None, ddk_dir: st
     work_dir.mkdir(parents=True, exist_ok=True)
     
     if ddk_dir is None:
-        ddk_path = DEFAULT_DDK_DIR
+        target_ddk = DEFAULT_DDK_DIR
     else:
-        ddk_path = Path(ddk_dir).resolve()
+        target_ddk = Path(ddk_dir).resolve()
         
-    ensure_ddk(ddk_path)
-    
-    # Check if system path has it if local doesn't
+    ddk_path = locate_ddk(target_ddk)
     build_dict_script = ddk_path / "bin" / "build_dict.sh"
-    if not build_dict_script.exists():
-        sys_ddk = Path("/Applications/Utilities/Dictionary Development Kit")
-        if (sys_ddk / "bin" / "build_dict.sh").exists():
-            ddk_path = sys_ddk
-            build_dict_script = ddk_path / "bin" / "build_dict.sh"
-            
-    if not build_dict_script.exists():
-        raise FileNotFoundError(f"build_dict.sh not found at {build_dict_script}")
 
     # 1. Decompress LD2
     print(f"[*] Decompressing {ld2_file.name}...")

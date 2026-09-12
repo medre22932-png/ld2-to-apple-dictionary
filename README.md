@@ -35,7 +35,11 @@ git clone https://github.com/medre22932-png/ld2-to-apple-dictionary.git
 cd ld2-to-apple-dictionary
 ```
 
-### 2. Convert a dictionary
+### 2. Apple Dictionary Development Kit (DDK)
+The script uses Apple's `build_dict.sh` compiler tools to create the native macOS binary package.
+Ensure you have the `ddk` folder placed in the project root, installed at `/Applications/Utilities/Dictionary Development Kit`, or specified via `--ddk /path/to/ddk`.
+
+### 3. Convert a dictionary
 Place your `.ld2` file in the folder, then run:
 
 ```bash
@@ -47,8 +51,6 @@ python3 convert_ld2.py --install "MyDictionary.ld2"
 # Or convert all .ld2 files in the current folder at once:
 python3 convert_ld2.py --install
 ```
-
-*(Note: On first run, the tool will automatically fetch the Apple Dictionary Development Kit tools if not present on your system).*
 
 ---
 
