@@ -1,0 +1,21 @@
+# Dictionary content files (proprietary / user specific)
+*.ld2
+*.dictionary
+*.inflated
+
+# Build artifacts
+build_*/
+objects/
+
+# Apple Dictionary Development Kit binaries (downloaded on demand)
+ddk/
+
+# macOS system files
+.DS_Store
+*.swp
+*~
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
