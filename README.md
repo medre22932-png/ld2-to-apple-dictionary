@@ -17,6 +17,9 @@ A fast, standalone Python tool to convert **Lingoes (`.ld2`)** dictionary files 
 
 ## Requirements
 
+> [!WARNING]
+> **macOS Only**: This tool can only be used on macOS. The output `.dictionary` bundle is Apple's native dictionary format, and compiling it requires Apple's Dictionary Development Kit compiler tools, which only run on macOS (Darwin). Windows and Linux are not supported for dictionary output.
+
 - **macOS** 10.11 or later (including macOS 14 Sonoma, macOS 15 Sequoia, and later).
 - **Python 3.8+** (standard Python library only — no pip dependencies required!).
 - **Rosetta 2** (if running on Apple Silicon / M-series Macs for Apple DDK helper binaries).

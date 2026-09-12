@@ -370,6 +370,12 @@ def locate_ddk(ddk_path: Path, allow_download: bool = False) -> Path:
 
 
 def convert_ld2_to_apple_dict(ld2_path: str, output_dir: str = None, ddk_dir: str = None, install: bool = False, download_ddk: bool = False):
+    if sys.platform != "darwin":
+        raise SystemError(
+            "Apple Dictionary (.dictionary) packages can only be built on macOS. "
+            "Apple's Dictionary Development Kit compiler tools require macOS (Darwin)."
+        )
+
     ld2_file = Path(ld2_path).resolve()
     dict_base_name = ld2_file.stem
     
@@ -574,6 +580,13 @@ end try
 
 
 def main():
+    if sys.platform != "darwin":
+        print("\n[!] Error: macOS is required.")
+        print("    Apple Dictionary (.dictionary) packages can only be built and used on macOS.")
+        print("    Apple's Dictionary Development Kit compiler tools are macOS-only binaries.")
+        print("    Windows and Linux are not supported for .dictionary output.\n")
+        sys.exit(1)
+
     parser = argparse.ArgumentParser(description="Convert Lingoes LD2 dictionaries to Apple Dictionary (.dictionary)")
     parser.add_argument("input", nargs="*", help="Path to .ld2 file(s). If none specified, opens a macOS file selection dialog.")
     parser.add_argument("--ddk", default=str(DEFAULT_DDK_DIR), help="Path to Apple Dictionary Development Kit folder")
