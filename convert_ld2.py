@@ -553,25 +553,46 @@ def convert_ld2_to_apple_dict(ld2_path: str, output_dir: str = None, ddk_dir: st
     return final_dest
 
 
+def choose_files_dialog() -> list[str]:
+    """Open a native macOS file dialog to select one or more .ld2 files."""
+    script = '''
+set filePaths to {}
+try
+    set chosenFiles to choose file with prompt "Select Lingoes (.ld2) dictionary file(s) to convert:" with multiple selections allowed
+    repeat with aFile in chosenFiles
+        set end of filePaths to POSIX path of aFile
+    end repeat
+    set AppleScript's text item delimiters to linefeed
+    return filePaths as text
+on error number -128
+    return ""
+end try
+'''
+    res = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+    selected = [line.strip() for line in res.stdout.splitlines() if line.strip()]
+    return selected
+
+
 def main():
     parser = argparse.ArgumentParser(description="Convert Lingoes LD2 dictionaries to Apple Dictionary (.dictionary)")
-    parser.add_argument("input", nargs="*", help="Path to .ld2 file(s). If none specified, converts all .ld2 in current folder.")
+    parser.add_argument("input", nargs="*", help="Path to .ld2 file(s). If none specified, opens a macOS file selection dialog.")
     parser.add_argument("--ddk", default=str(DEFAULT_DDK_DIR), help="Path to Apple Dictionary Development Kit folder")
     parser.add_argument("--download-ddk", action="store_true", help="Automatically download Apple DDK tools if missing")
-    parser.add_argument("--install", action="store_true", help="Automatically install to ~/Library/Dictionaries")
+    parser.add_argument("--install", action="store_true", help="Optionally install to ~/Library/Dictionaries (disabled by default)")
     parser.add_argument("--output-dir", default=None, help="Temporary build directory")
 
     args = parser.parse_args()
 
     files = args.input
     if not files:
-        files = sorted([f for f in os.listdir(".") if f.endswith(".ld2")])
+        print("[*] No input files specified on command line. Opening macOS file dialog...")
+        files = choose_files_dialog()
 
     if not files:
-        print("No .ld2 files found to convert!")
-        sys.exit(1)
+        print("No files selected or specified.")
+        sys.exit(0)
 
-    print(f"Found {len(files)} dictionary file(s) to convert:")
+    print(f"\nSelected {len(files)} dictionary file(s) to convert:")
     for f in files:
         print(f" - {f}")
     print()

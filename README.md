@@ -41,16 +41,21 @@ The script uses Apple's `build_dict.sh` compiler tools to create the native macO
 - **Manual**: Alternatively, place an existing `ddk` folder in the project root, install it at `/Applications/Utilities/Dictionary Development Kit`, or pass `--ddk /path/to/ddk`.
 
 ### 3. Convert a dictionary
-Place your `.ld2` file in the folder, then run:
 
+#### Option A: macOS File Dialog (Easiest)
+Simply run the script with no arguments:
 ```bash
-# Convert a specific dictionary and install it into macOS Dictionary:
-python3 convert_ld2.py --install "MyDictionary.ld2"
+python3 convert_ld2.py
 ```
+A native macOS open dialog will appear to let you select one or more `.ld2` files. The resulting `.dictionary` package is saved directly in the folder where your selected `.ld2` file resides.
 
+#### Option B: Command-Line
 ```bash
-# Or convert all .ld2 files in the current folder at once:
-python3 convert_ld2.py --install
+# Convert a specific file (saves .dictionary in the same folder):
+python3 convert_ld2.py "/path/to/MyDictionary.ld2"
+
+# Or optionally convert AND install directly into macOS Dictionary:
+python3 convert_ld2.py --install "/path/to/MyDictionary.ld2"
 ```
 
 ---
