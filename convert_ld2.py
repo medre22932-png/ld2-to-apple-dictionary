@@ -193,6 +193,52 @@ PLIST_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 """
 
+TAG_RE = re.compile(r"(</?([a-zA-Z0-9_:]+)(?:\s+[^>]*?)?>)", re.DOTALL)
+VOID_TAGS = {"br", "img", "hr"}
+
+def balance_tags(html_str: str) -> str:
+    """
+    Repair broken, unclosed, or improperly interleaved HTML tags so the string
+    becomes 100% strictly valid XHTML.
+    """
+    if "<" not in html_str:
+        return html_str
+    stack = []
+    output = []
+    last_idx = 0
+    
+    for match in TAG_RE.finditer(html_str):
+        start, end = match.span()
+        output.append(html_str[last_idx:start])
+        last_idx = end
+        
+        full_tag = match.group(1)
+        tag_name = match.group(2).lower()
+        is_closing = full_tag.startswith("</")
+        is_self_closing = full_tag.endswith("/>") or tag_name in VOID_TAGS
+        
+        if is_self_closing:
+            if not full_tag.endswith("/>"):
+                full_tag = f"<{tag_name}/>"
+            output.append(full_tag)
+        elif is_closing:
+            if tag_name in stack:
+                while stack:
+                    top = stack.pop()
+                    output.append(f"</{top}>")
+                    if top == tag_name:
+                        break
+        else:
+            stack.append(tag_name)
+            output.append(full_tag)
+            
+    output.append(html_str[last_idx:])
+    while stack:
+        top = stack.pop()
+        output.append(f"</{top}>")
+    return "".join(output)
+
+
 def clean_xml_content(raw_xml: str) -> tuple[str, str]:
     """
     Parse Lingoes XML formatting and convert to valid, clean XHTML.
@@ -201,43 +247,56 @@ def clean_xml_content(raw_xml: str) -> tuple[str, str]:
     # Remove null and invalid control characters
     text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f]', '', raw_xml)
     
+    # Strip empty self-closing non-void tags like <H />, <g />, <h />, etc.
+    text = re.sub(r'<(?!br\b|img\b|hr\b)([a-zA-Z0-9_:]+)\s*/>', '', text)
+    
     # Extract phonetic / pronunciation if present in <H><L>...</L></H>
     phonetic = ""
-    m_h = re.search(r'<H\b[^>]*>(.*?)</H>', text, re.DOTALL)
+    m_h = re.search(r'<H(?:\s+[^/>]*)?>(.*?)</H>', text, re.DOTALL)
     if m_h:
         h_content = m_h.group(1)
-        m_l = re.search(r'<L\b[^>]*>(.*?)</L>', h_content, re.DOTALL)
+        m_l = re.search(r'<L(?:\s+[^/>]*)?>(.*?)</L>', h_content, re.DOTALL)
         if m_l:
             phonetic = m_l.group(1).strip()
         text = text[:m_h.start()] + text[m_h.end():]
     
-    # Clean any remaining empty or self-closing H tags
-    text = re.sub(r'<H\s*\/?>', '', text)
-    text = re.sub(r'</H>', '', text)
+    # Clean any remaining H or L tags
+    text = re.sub(r'</?(?:H|L)\b[^>]*>', '', text)
     
     # Handle CDATA if wrapped
     cdata_m = re.search(r'<!\[CDATA\[(.*?)\]\]>', text, re.DOTALL)
     if cdata_m:
         text = cdata_m.group(1)
     
-    # Replace semantic tags
-    text = re.sub(r'<U\b[^>]*>(.*?)</U>', r'<span class="pos">\1</span>', text, flags=re.DOTALL)
-    text = re.sub(r'<M\b[^>]*>(.*?)</M>', r'<span class="meaning">\1</span>', text, flags=re.DOTALL)
-    text = re.sub(r'<g\b[^>]*>(.*?)</g>', r'<b>\1</b>', text, flags=re.DOTALL)
-    text = re.sub(r'<h\b[^>]*>(.*?)</h>', r'<i>\1</i>', text, flags=re.DOTALL)
-    
     # Links / cross-references
     text = re.sub(r'<Y\s+O="([^"]*)">(.*?)</Y>', r'<a href="x-dictionary:d:\1">\2</a>', text, flags=re.DOTALL)
+    text = re.sub(r'<Y(?:\s+[^/>]*)?>(.*?)</Y>', r'<a href="x-dictionary:d:\1">\1</a>', text, flags=re.DOTALL)
+    text = re.sub(r'</?Y\b[^>]*>', '', text)
+    
+    # Replace semantic tags (avoiding self-closing tags)
+    text = re.sub(r'<U(?:\s+[^/>]*)?>(.*?)</U>', r'<span class="pos">\1</span>', text, flags=re.DOTALL)
+    text = re.sub(r'<M(?:\s+[^/>]*)?>(.*?)</M>', r'<span class="meaning">\1</span>', text, flags=re.DOTALL)
+    text = re.sub(r'<g(?:\s+[^/>]*)?>(.*?)</g>', r'<b>\1</b>', text, flags=re.DOTALL)
+    text = re.sub(r'<h(?:\s+[^/>]*)?>(.*?)</h>', r'<i>\1</i>', text, flags=re.DOTALL)
     
     # Line breaks
     text = re.sub(r'<n\s*\/?>', '<br/>', text)
     text = re.sub(r'<br\s*>', '<br/>', text)
     
     # Strip remaining Lingoes structural tags: C, F, I, N, Q, Ô, etc.
-    text = re.sub(r'</?(?:C|F|I|N|Q|Ô|L)\b[^>]*>', ' ', text)
+    text = re.sub(r'</?(?:C|F|I|N|Q|Ô|P|A|T|Z)\b[^>]*>', ' ', text)
+    
+    # Strip any tag that is not allowed in Apple Dictionary XHTML
+    text = re.sub(r'</?(?!(?:b|i|span|a|br)\b)[a-zA-Z0-9_:]+[^>]*>', '', text)
     
     # Ensure any stray unescaped & is &amp;
     text = re.sub(r'&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)', '&amp;', text)
+    
+    # Ensure any stray unescaped < is &lt;
+    text = re.sub(r'<(?!(?:/?(?:b|i|span|a)\b|br\s*/?>))', '&lt;', text)
+    
+    # Balance and strictly close all tags
+    text = balance_tags(text)
     
     # Clean multiple spaces and trim
     text = re.sub(r'[ \t]+', ' ', text)
